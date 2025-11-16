@@ -1,0 +1,32 @@
+version: "3.9"
+services:
+  app:
+    build: .
+    container_name: duckdb-analytics
+    ports:
+      - "3000:3000"
+    environment:
+      # Required
+      - PORT=3000
+      - DUCKDB_PATH=/data/main.duckdb
+      # Auth (set strong keys in prod)
+      - API_KEY=${API_KEY:-dev-api-key}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-dev-admin-key}
+      # Optional R2/S3 exports
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_REGION=${R2_REGION:-auto}
+      - R2_BUCKET=${R2_BUCKET:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - PRESIGN_TTL_SECONDS=${PRESIGN_TTL_SECONDS:-900}
+      # Export/Compaction tuning
+      - EXPORT_INTERVAL_MS=${EXPORT_INTERVAL_MS:-60000}
+      - COMPACTION_INTERVAL_MS=${COMPACTION_INTERVAL_MS:-3600000}
+      - TARGET_PARQUET_MB=${TARGET_PARQUET_MB:-128}
+      # Rate limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-120}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+

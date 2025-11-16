@@ -1,0 +1,20 @@
+{
+  "name": "duckdb-analytics",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "migrate": "bun run scripts/migrate.ts",
+    "demo": "bun run scripts/demo.ts"
+  },
+  "dependencies": {
+    "hono": "^4.10.6",
+    "pino": "^10.1.0",
+    "zod": "^4.1.12",
+    "@aws-sdk/client-s3": "^3.609.0",
+    "@aws-sdk/s3-request-presigner": "^3.609.0",
+    "duckdb": "^1.4.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
