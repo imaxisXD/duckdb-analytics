@@ -16,9 +16,6 @@ RUN chmod +x scripts/entrypoint.sh
 ENV PORT=3000
 ENV DUCKDB_PATH=/data/main.duckdb
 
-# Declare a volume for DuckDB data (maps via compose)
-VOLUME ["/data"]
-
 EXPOSE 3000
 
 CMD ["./scripts/entrypoint.sh"]
