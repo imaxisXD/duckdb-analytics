@@ -24,15 +24,13 @@ export async function requestLogger(c: Context, next: Next) {
 
 export function requireAuth() {
   return async (c: Context, next: Next) => {
-    const apiKey = c.req.header('x-api-key')
-    if (!cfg.API_KEY || apiKey !== cfg.API_KEY) {
+    const apiKeyHeader = c.req.header('x-api-key') ?? ''
+    const authHeader = c.req.header('authorization') ?? ''
+    const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : ''
+    const provided = bearer || apiKeyHeader
+    if (!cfg.API_KEY || provided !== cfg.API_KEY) {
       return c.json({ error: 'unauthorized' }, 401)
     }
-    const tenantId = c.req.header('x-tenant-id')
-    if (!tenantId) {
-      return c.json({ error: 'missing tenant' }, 400)
-    }
-    c.set('tenantId', tenantId)
     await next()
   }
 }
@@ -52,8 +50,7 @@ const counters = new Map<string, Counter>()
 
 export function rateLimit() {
   return async (c: Context, next: Next) => {
-    const tenantId: string | undefined = c.get('tenantId')
-    const key = tenantId ?? c.req.header('x-forwarded-for') ?? 'global'
+    const key = c.req.header('x-forwarded-for') ?? 'global'
     const now = Date.now()
     const winMs = cfg.RATE_LIMIT_WINDOW_MS
     const max = cfg.RATE_LIMIT_MAX
@@ -68,12 +65,6 @@ export function rateLimit() {
     }
     await next()
   }
-}
-
-export function getTenantId(c: Context): string {
-  const t = c.get('tenantId')
-  if (!t) throw new Error('tenant not in context')
-  return t
 }
 
 export function getReqId(c: Context): string {

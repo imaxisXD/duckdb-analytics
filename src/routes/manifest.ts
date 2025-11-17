@@ -1,12 +1,14 @@
 import { Hono } from 'hono'
-import { getTenantId } from '../middleware'
 import { listPrefix, presignGet, parsePartitionsFromKey } from '../r2'
 
 export const manifest = new Hono()
 
 manifest.get('/', async (c) => {
-  const tenantId = getTenantId(c)
-  const prefix = `tenant_id=${tenantId}/`
+  const userId = c.req.query('user_id')
+  if (!userId) {
+    return c.json({ error: 'missing user_id' }, 400)
+  }
+  const prefix = `user_id=${userId}/`
   const objs = await listPrefix(prefix)
   const items = await Promise.all(
     objs
@@ -24,7 +26,7 @@ manifest.get('/', async (c) => {
         }
       })
   )
-  return c.json({ tenantId, items })
+  return c.json({ userId, items })
 })
 
 

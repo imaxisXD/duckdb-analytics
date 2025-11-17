@@ -1,6 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import duckdb from 'duckdb'
+import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
+import type { DuckDBValue } from '@duckdb/node-api'
 import { loadConfig } from '../src/config'
 
 type MigrationRecord = { version: string }
@@ -10,31 +11,30 @@ function ensureDir(filePath: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 }
 
-function runAsync(conn: any, sql: string, params?: any[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (params && params.length > 0) {
-      conn.run(sql, params, (err: unknown) => (err ? reject(err) : resolve()))
-    } else {
-      conn.run(sql, (err: unknown) => (err ? reject(err) : resolve()))
-    }
-  })
+async function runAsync(conn: DuckDBConnection, sql: string, params?: DuckDBValue[]): Promise<void> {
+  if (params && params.length > 0) {
+    await conn.run(sql, params)
+  } else {
+    await conn.run(sql)
+  }
 }
 
-function allAsync<T = any>(conn: any, sql: string, params?: any[]): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    if (params && params.length > 0) {
-      conn.all(sql, params, (err: unknown, rows: T[]) => (err ? reject(err) : resolve(rows)))
-    } else {
-      conn.all(sql, (err: unknown, rows: T[]) => (err ? reject(err) : resolve(rows)))
-    }
-  })
+async function allAsync<T = unknown>(
+  conn: DuckDBConnection,
+  sql: string,
+  params?: DuckDBValue[]
+): Promise<T[]> {
+  const reader =
+    params && params.length > 0 ? await conn.runAndReadAll(sql, params) : await conn.runAndReadAll(sql)
+  const rows = reader.getRowObjects()
+  return rows as T[]
 }
 
 async function main() {
   const cfg = loadConfig()
   ensureDir(cfg.DUCKDB_PATH)
-  const db = new duckdb.Database(cfg.DUCKDB_PATH)
-  const conn = db.connect()
+  const instance = await DuckDBInstance.create(cfg.DUCKDB_PATH)
+  const conn = await instance.connect()
 
   await runAsync(
     conn,
@@ -49,8 +49,8 @@ async function main() {
   const migrationsDir = path.join(process.cwd(), 'migrations')
   if (!fs.existsSync(migrationsDir)) {
     console.log('No migrations directory found, skipping.')
-    conn.close()
-    db.close()
+    conn.disconnectSync()
+    instance.closeSync()
     return
   }
 
@@ -85,8 +85,8 @@ async function main() {
     }
   }
 
-  conn.close()
-  db.close()
+  conn.disconnectSync()
+  instance.closeSync()
 }
 
 main().catch((e) => {

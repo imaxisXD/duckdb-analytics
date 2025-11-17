@@ -4,9 +4,9 @@ import * as os from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { loadConfig } from './config'
 import { logger } from './logger'
-import { getDb } from './db'
-import { listPrefix, parsePartitionsFromKey, uploadFile, deleteKeys, buildTenantKey, presignGet } from './r2'
-import { listDistinctTenants } from './db'
+import { getDb, listDistinctUsers } from './db'
+import { listPrefix, parsePartitionsFromKey, uploadFile, deleteKeys, buildUserKey, presignGet } from './r2'
+
 
 const cfg = loadConfig()
 const log = logger.child({ mod: 'compactor' })
@@ -27,12 +27,12 @@ function groupByDtHr(objs: Obj[]) {
 }
 
 export async function runCompactionOnce() {
-  const { conn } = getDb()
-  const tenants = await listDistinctTenants(conn)
-  if (tenants.length === 0) return
-  for (const tenantId of tenants) {
+  const { conn } = await getDb()
+  const users = await listDistinctUsers(conn)
+  if (users.length === 0) return
+  for (const userId of users) {
     try {
-      const prefix = `tenant_id=${tenantId}/`
+      const prefix = `user_id=${userId}/`
       const objs = await listPrefix(prefix)
       if (objs.length === 0) continue
       const groups = groupByDtHr(objs)
@@ -50,9 +50,9 @@ export async function runCompactionOnce() {
           const url = await presignGet(f.Key)
           urls.push(url)
         }
-        const { conn } = getDb()
+        const { conn } = await getDb()
         // Enable httpfs to read https urls
-        await new Promise<void>((resolve, reject) => conn.run('INSTALL httpfs; LOAD httpfs;', (err: unknown) => (err ? reject(err) : resolve())))
+        await conn.run('INSTALL httpfs; LOAD httpfs;')
         const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'duckdb-compact-'))
         const outfile = path.join(tmpdir, `compact-${randomUUID()}.parquet`)
         const urlArgs = urls.map((u) => `'${u.replace(/'/g, "''")}'`).join(', ')
@@ -61,18 +61,18 @@ export async function runCompactionOnce() {
             SELECT * FROM read_parquet(${urlArgs})
           ) TO '${outfile.replace(/'/g, "''")}' (FORMAT PARQUET, COMPRESSION ZSTD);
         `
-        await new Promise<void>((resolve, reject) => conn.run(sql, (err: unknown) => (err ? reject(err) : resolve())))
+        await conn.run(sql)
         const data = fs.readFileSync(outfile)
-        const newKey = buildTenantKey(tenantId, dt, hr, `part-compact-${randomUUID()}.parquet`)
+        const newKey = buildUserKey(userId, dt, hr, `part-compact-${randomUUID()}.parquet`)
         await uploadFile(newKey, data, 'application/octet-stream')
         // delete old small files
         const delKeys = smallFiles.map((f) => f.Key!).filter(Boolean)
         await deleteKeys(delKeys)
-        log.info({ tenantId, dt, hr, filesMerged: smallFiles.length, newKey }, 'compaction:completed')
+        log.info({ userId, dt, hr, filesMerged: smallFiles.length, newKey }, 'compaction:completed')
         try { fs.rmSync(tmpdir, { recursive: true, force: true }) } catch (_err: unknown) {}
       }
     } catch (err) {
-      log.error({ tenantId, err }, 'compaction error')
+      log.error({ userId, err }, 'compaction error')
     }
   }
 }

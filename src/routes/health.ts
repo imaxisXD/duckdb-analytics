@@ -7,8 +7,8 @@ health.get('/', (c) => c.text('ok'))
 
 health.get('/ready', async (c) => {
   try {
-    const { conn } = getDb()
-    await new Promise<void>((resolve, reject) => conn.all('SELECT 1', (err) => (err ? reject(err) : resolve())))
+    const { conn } = await getDb()
+    await conn.run('SELECT 1')
     return c.text('ready')
   } catch {
     return c.text('not-ready', 500)

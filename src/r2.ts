@@ -73,12 +73,12 @@ export async function deleteKeys(keys: string[]) {
   log.info({ deleted: keys.length }, 'r2: deleted objects')
 }
 
-export function buildTenantKey(tenantId: string, dt: string, hr: string, filename: string) {
-  return `tenant_id=${tenantId}/dt=${dt}/hr=${hr}/${filename}`
+export function buildUserKey(userId: string, dt: string, hr: string, filename: string) {
+  return `user_id=${userId}/dt=${dt}/hr=${hr}/${filename}`
 }
 
 export function parsePartitionsFromKey(key: string): Record<string, string> {
-  // Expect keys like: tenant_id=T/dt=YYYY-MM-DD/hr=HH/part-uuid.parquet
+  // Expect keys like: user_id=U/dt=YYYY-MM-DD/hr=HH/part-uuid.parquet
   const parts: Record<string, string> = {}
   const segs = key.split('/')
   for (const s of segs) {
